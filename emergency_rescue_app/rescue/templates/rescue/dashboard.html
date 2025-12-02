@@ -1,0 +1,364 @@
+
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResQ Health Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Body and container styling */
+        body {
+            background: #1e1e1e;
+            color: #f8f9fa;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        .main-container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        /* Card styling for sections */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        /* Header styling */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+        .header .logo {
+            font-weight: bold;
+            font-size: 1.2rem;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 5px 15px;
+            letter-spacing: 1px;
+        }
+
+        /* Emergency button styling */
+        .emergency-button {
+            background: linear-gradient(145deg, #e60000, #ff4d4d);
+            color: white;
+            border-radius: 50%;
+            width: 180px;
+            height: 180px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-transform: uppercase;
+            font-weight: bold;
+            font-size: 1.5rem;
+            margin: 20px auto;
+            border: none;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+            transition: transform 0.2s;
+        }
+        .emergency-button:hover {
+            transform: scale(1.05);
+        }
+
+        /* How it works section styling */
+        .how-it-works .list-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        .how-it-works .list-item i {
+            margin-right: 10px;
+            color: #ff4d4d;
+            font-size: 1.2rem;
+        }
+
+        /* Response status section styling */
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .status-header h5 {
+            margin: 0;
+        }
+        .status-item {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+        .status-item i {
+            font-size: 1.5rem;
+            margin-right: 15px;
+            color: #ff4d4d;
+        }
+        .status-item .status-text {
+            flex-grow: 1;
+        }
+        .status-item .status-text small {
+            color: #99ccff;
+        }
+
+        /* Navigation bar styling */
+        .bottom-nav {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+        }
+        .bottom-nav a {
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            font-size: 0.8rem;
+            opacity: 0.6;
+        }
+        .bottom-nav a.active {
+            opacity: 1;
+            color: #ff4d4d;
+        }
+        .bottom-nav a i {
+            display: block;
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="header">
+            <span class="logo">RESQ HEALTH</span>
+        </div>
+
+        <!-- Emergency Assistance Section -->
+        <div class="glass-card">
+            <h4 class="text-center">Emergency Assistance</h4>
+            <p class="text-center text-secondary">Press the button below to request immediate help</p>
+            
+            <div id="patient-info" data-patient-id="{{ patient.patient_id }}"></div>
+            {% csrf_token %}
+            <div id="status-message" class="mt-3 text-center"></div>
+
+            <div id="emergency-section" style="display: none;">
+                <p id="user-details" class="text-center">Hello, <strong id="user-name"></strong>!</p>
+                <button class="emergency-button" id="emergency-button">
+                    <i class="fas fa-bullhorn mb-2" style="font-size: 2rem;"></i>
+                    EMERGENCY
+                </button>
+            </div>
+        </div>
+
+        <!-- Patient Details Section (Visible only after lookup) -->
+        <div id="patient-details-card" class="glass-card" style="display: none;">
+            <h5 class="text-uppercase">Medical Profile</h5>
+            <div id="patient-details-content">
+                <!-- Patient data will be inserted here -->
+            </div>
+        </div>
+
+        <!-- How it works Section -->
+        <div class="glass-card how-it-works">
+            <div class="d-flex align-items-center mb-3">
+                <i class="fas fa-info-circle me-2"></i>
+                <h6>How it works:</h6>
+            </div>
+            <ul>
+                <li class="list-item"><i class="fas fa-circle" style="font-size: 0.6rem;"></i> Press the emergency button to send an alert</li>
+                <li class="list-item"><i class="fas fa-circle" style="font-size: 0.6rem;"></i> Your location will be shared with responders</li>
+                <li class="list-item"><i class="fas fa-circle" style="font-size: 0.6rem;"></i> Medical profile will be sent to emergency services</li>
+                <li class="list-item"><i class="fas fa-circle" style="font-size: 0.6rem;"></i> Nearest ambulance will be dispatched</li>
+                <li class="list-item"><i class="fas fa-circle" style="font-size: 0.6rem;"></i> Live tracking will be enabled for medical team</li>
+            </ul>
+        </div>
+
+        <!-- Response Status Section -->
+        <div class="glass-card">
+            <div class="status-header">
+                <h5 class="text-uppercase">Response Status</h5>
+                <i class="fas fa-list-ul"></i>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-map-marker-alt"></i>
+                <div class="status-text">
+                    <strong>Location Access</strong>
+                    <br>
+                    <small id="location-status">Waiting for access</small>
+                </div>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-microphone"></i>
+                <div class="status-text">
+                    <strong>Microphone Access</strong>
+                    <br>
+                    <small id="microphone-status">Access denied</small>
+                </div>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-user-check"></i>
+                <div class="status-text">
+                    <strong>System Status</strong>
+                    <br>
+                    <small id="system-status">Operational</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <a href="{% url 'rescue_dashboard' %}" class="active"><i class="fas fa-home"></i>Home</a>
+        <a href="#"><i class="fas fa-user-circle"></i>Profile</a>
+        <a href="#"><i class="fas fa-map-marked-alt"></i>Tracking</a>
+        <a href="{% url 'logout' %}"><i class="fas fa-sign-out-alt"></i>Logout</a>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const patientForm = document.getElementById('patient-form');
+        const patientIdInput = document.getElementById('patientId');
+        const emergencyButton = document.getElementById('emergency-button');
+        const emergencySection = document.getElementById('emergency-section');
+        const userDetailsP = document.getElementById('user-details');
+        const userNameSpan = document.getElementById('user-name');
+        const statusMessage = document.getElementById('status-message');
+        const patientDetailsCard = document.getElementById('patient-details-card');
+        const patientDetailsContent = document.getElementById('patient-details-content');
+        const locationStatus = document.getElementById('location-status');
+
+        // Function to fetch patient details from the API
+        async function fetchPatientDetails(patientId) {
+            statusMessage.innerHTML = '<span class="text-info">Loading patient details...</span>';
+            try {
+                const response = await fetch(`/api/patient_details/${patientId}/`);
+                const data = await response.json();
+                if (response.ok) {
+                    displayPatientDetails(data);
+                    emergencySection.style.display = 'block';
+                    statusMessage.innerHTML = '<span class="text-success">Patient details loaded successfully.</span>';
+                } else {
+                    hidePatientDetails();
+                    statusMessage.innerHTML = `<span class="text-danger">${data.error}</span>`;
+                }
+            } catch (error) {
+                hidePatientDetails();
+                statusMessage.innerHTML = `<span class="text-danger">Error fetching patient details.</span>`;
+            }
+        }
+
+        // Function to display patient details on the page
+        function displayPatientDetails(patient) {
+            userNameSpan.textContent = patient.name;
+            patientDetailsContent.innerHTML = `
+                <p><strong>Name:</strong> ${patient.name}</p>
+                <p><strong>Blood Type:</strong> ${patient.blood_type}</p>
+                <p><strong>Allergies:</strong> ${patient.allergies || 'N/A'}</p>
+                <p><strong>Medications:</strong> ${patient.medications || 'N/A'}</p>
+                <p><strong>Condition:</strong> ${patient.condition || 'N/A'}</p>
+                <p><strong>Emergency Contact:</strong> ${patient.emergency_contact || 'N/A'}</p>
+                <p><strong>Health Summary:</strong> ${patient.health_summary || 'N/A'}</p>
+            `;
+            patientDetailsCard.style.display = 'block';
+        }
+
+        // Function to hide patient details section
+        function hidePatientDetails() {
+            patientDetailsCard.style.display = 'none';
+            emergencySection.style.display = 'none';
+            userNameSpan.textContent = '';
+            patientDetailsContent.innerHTML = '';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const patientInfo = document.getElementById('patient-info');
+            const patientId = patientInfo.dataset.patientId;
+            if (patientId) {
+                fetchPatientDetails(patientId);
+            }
+        });
+
+        // Event listener for the emergency button
+        emergencyButton.addEventListener('click', async function(e) {
+            e.preventDefault();
+            const patientInfo = document.getElementById('patient-info');
+            const patientId = patientInfo.dataset.patientId;
+            if (!patientId) {
+                statusMessage.innerHTML = '<span class="text-danger">Could not find patient ID.</span>';
+                return;
+            }
+
+            statusMessage.innerHTML = '<span class="text-info">Getting location...</span>';
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            try {
+                const location = await getGeolocation();
+                statusMessage.innerHTML = '<span class="text-warning">Sending alert...</span>';
+                const response = await fetch('/api/send_emergency/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({
+                        patient_id: patientId,
+                        latitude: location.latitude,
+                        longitude: location.longitude
+                    })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    statusMessage.innerHTML = `<span class="text-success">${data.success}</span>`;
+                } else {
+                    statusMessage.innerHTML = `<span class="text-danger">${data.error}</span>`;
+                }
+            } catch (error) {
+                statusMessage.innerHTML = `<span class="text-danger">Error: ${error.message}</span>`;
+            }
+        });
+
+        // Geolocation function for the emergency button
+        function getGeolocation() {
+            return new Promise((resolve, reject) => {
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                        position => {
+                            locationStatus.textContent = 'Access granted';
+                            locationStatus.style.color = '#28a745'; // Green color
+                            resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+                        },
+                        error => {
+                            locationStatus.textContent = 'Access denied';
+                            locationStatus.style.color = '#dc3545'; // Red color
+                            reject(error);
+                        }
+                    );
+                } else {
+                    locationStatus.textContent = 'Not supported';
+                    locationStatus.style.color = '#dc3545'; // Red color
+                    reject(new Error("Geolocation is not supported by this browser."));
+                }
+            });
+        }
+    </script>
+</body>
+</html>

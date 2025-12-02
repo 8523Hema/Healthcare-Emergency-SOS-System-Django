@@ -1,0 +1,379 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+        }
+
+        .dashboard-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: #2b0b13;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .sidebar .nav-link {
+            color: #fff;
+            padding: 15px;
+            border-radius: 5px;
+        }
+
+        .sidebar .nav-link.active {
+            background-color: #dc3545;
+        }
+
+        .sidebar .nav-link:hover {
+            background-color: #49171f;
+        }
+
+        .content-area {
+            flex-grow: 1;
+            padding: 20px;
+        }
+
+        .map-panel {
+            height: calc(100vh - 100px);
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+        }
+
+        .alert-card {
+            border-left: 5px solid #dc3545;
+            margin-bottom: 15px;
+            padding: 15px;
+            background-color: #fff8f8;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            cursor: pointer;
+        }
+
+        .alert-details {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8d7da;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-container">
+        <div class="sidebar">
+            <h4 class="text-white mb-4">RESQ HOSPITAL</h4>
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link active" href="#">
+                        <i class="fas fa-bell me-2"></i>Emergency Alerts
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="fas fa-ambulance me-2"></i>Ambulances
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="fas fa-users me-2"></i>Staff
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="fas fa-chart-line me-2"></i>Analytics
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="fas fa-cog me-2"></i>Settings
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div class="content-area">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Emergency Alerts <span id="connection-status" class="badge bg-warning ms-2">Disconnected</span></h2>
+                <span class="fs-5" id="current-time"></span>
+            </div>
+
+            <div class="d-flex" style="height: calc(100vh - 100px);">
+                <div class="alerts-panel me-4" style="flex-grow: 1;">
+                    <div id="alerts-list">
+                        <p id="no-alerts-message" class="text-center" style="display: none;">
+                            <i class="fas fa-map-marker-alt fs-1 text-secondary mb-2"></i>
+                            <br>No active emergency alerts
+                        </p>
+                    </div>
+                </div>
+
+                <div class="map-panel" style="width: 70%;">
+                    <div id="map"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    {{ hospitals_json|json_script:"hospitals-data" }}
+    {{ alerts_json|json_script:"alerts-data" }}
+    <script>
+    console.log("🚨 hospitals-data element:", document.getElementById('hospitals-data'));
+    console.log("🚨 alerts-data element:", document.getElementById('alerts-data'));
+</script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const hospitalsDataEl = document.getElementById('hospitals-data');
+            console.log('Raw hospitals content:', hospitalsDataEl.textContent);
+            // Default to an empty array string if the content is empty
+            // let rawHospitalsContent = hospitalsDataEl.textContent?.trim();
+            // if (!rawHospitalsContent || rawHospitalsContent === '""') rawHospitalsContent = '[]';
+
+            // let hospitals;
+            // try {
+            //     hospitals = JSON.parse(rawHospitalsContent);
+            // } catch (e) {
+            //     console.error("Invalid JSON for hospitals, defaulting to empty array:", rawHospitalsContent);
+            //     hospitals = [];
+            // }
+
+            // if (!Array.isArray(hospitals)) hospitals = [];
+            let rawHospitalsContent = hospitalsDataEl.textContent?.trim();
+if (!rawHospitalsContent || rawHospitalsContent === '""') rawHospitalsContent = '[]';
+
+// ✅ If the parsed result is a string, parse AGAIN
+let hospitals = [];
+try {
+    let parsed = JSON.parse(rawHospitalsContent);
+    hospitals = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+} catch (e) {
+    console.error("Invalid JSON for hospitals, defaulting to empty array:", rawHospitalsContent);
+}
+
+            console.log('Parsed hospitals object:', hospitals);
+            console.log('Is hospitals an array?:', Array.isArray(hospitals));
+
+            let hospitalCoords;
+
+            if (hospitals.length > 0) {
+                hospitalCoords = [hospitals[0].lat, hospitals[0].lon];
+            } else {
+                hospitalCoords = [12.9716, 77.5946]; // Default to Bangalore
+            }
+
+            var map = L.map('map').setView(hospitalCoords, 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            var hospitalIcon = L.icon({
+                iconUrl: 'https://cdn-icons-png.flaticon.com/512/1070/1070757.png',
+                iconSize: [38, 38],
+                iconAnchor: [19, 38],
+                popupAnchor: [0, -38]
+            });
+
+            hospitals.forEach(hospital => {
+                L.marker([hospital.lat, hospital.lon], { icon: hospitalIcon }).addTo(map)
+                    .bindPopup(`<b>${hospital.name}</b>`);
+            });
+
+            const patientData = {};
+            const activeRoutes = {};
+
+            function getRouteAndDraw(patientLat, patientLon, alertId) {
+                console.log(`Calculating route for alert ${alertId} with patient location: ${patientLat}, ${patientLon}`);
+
+                if (hospitals.length === 0) {
+                    console.error("No hospitals found. Please add hospitals in the admin panel.");
+                    return;
+                }
+
+                let nearestHospital = hospitals[0];
+                let minDistance = Infinity;
+
+                hospitals.forEach(hospital => {
+                    const distance = getDistance(patientLat, patientLon, hospital.lat, hospital.lon);
+                    console.log(`Distance to ${hospital.name}: ${distance.toFixed(2)} km`);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        nearestHospital = hospital;
+                    }
+                });
+
+                console.log(`Nearest hospital found: ${nearestHospital.name} at ${nearestHospital.lat}, ${nearestHospital.lon}`);
+
+                const osrmUrl = `http://router.project-osrm.org/route/v1/driving/${nearestHospital.lon},${nearestHospital.lat};${patientLon},${patientLat}?overview=full&geometries=geojson`;
+                fetch(osrmUrl)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.code === 'Ok') {
+                            const route = data.routes[0].geometry;
+                            const routeCoords = route.coordinates.map(coord => [coord[1], coord[0]]);
+                            if (activeRoutes[alertId]) {
+                                map.removeLayer(activeRoutes[alertId]);
+                            }
+                            const polyline = L.polyline(routeCoords, { color: 'red', weight: 5 }).addTo(map);
+                            activeRoutes[alertId] = polyline;
+                        } else {
+                            console.error("OSRM Routing Error:", data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Failed to fetch route:", error);
+                    });
+            }
+
+            const socket = new WebSocket('ws://' + window.location.host + '/ws/emergency_alerts/');
+            socket.onopen = function () {
+                document.getElementById('connection-status').innerText = 'Connected';
+                document.getElementById('connection-status').classList.remove('bg-warning');
+                document.getElementById('connection-status').classList.add('bg-success');
+            };
+            socket.onclose = function () {
+                document.getElementById('connection-status').innerText = 'Disconnected';
+                document.getElementById('connection-status').classList.remove('bg-success');
+                document.getElementById('connection-status').classList.add('bg-warning');
+            };
+
+            function renderAlertCard(alert) {
+                const alertsList = document.getElementById('alerts-list');
+                const newAlertHtml = `
+                    <div class="alert-card" id="alert-${alert.id}" onclick="toggleAlert('alert-${alert.id}', ${alert.latitude}, ${alert.longitude})">
+                        <h5 class="text-danger">Emergency from ${alert.patient_name}</h5>
+                        <p><strong>Patient ID:</strong> ${alert.patient_id}</p>
+                        <div class="alert-details" id="details-${alert.id}">
+                            <h6>Patient Profile</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Allergies:</strong> ${alert.patient_details.allergies || 'N/A'}</li>
+                                <li><strong>Blood Type:</strong> ${alert.patient_details.blood_type || 'N/A'}</li>
+                                <li><strong>Condition:</strong> ${alert.patient_details.condition || 'N/A'}</li>
+                                <li><strong>Medications:</strong> ${alert.patient_details.medications || 'N/A'}</li>
+                                <li><strong>Emergency Contact:</strong> ${alert.patient_details.emergency_contact || 'N/A'}</li>
+                                <li><strong>Health Summary:</strong> ${alert.patient_details.health_summary || 'N/A'}</li>
+                            </ul>
+                        </div>
+                        <small class="text-muted">Just now</small>
+                    </div>
+                `;
+                alertsList.insertAdjacentHTML('afterbegin', newAlertHtml);
+            }
+
+            socket.onmessage = function (e) {
+                const data = JSON.parse(e.data);
+                if (data.type === 'emergency_alert') {
+                    const alertData = data.data;
+                    const noAlerts = document.getElementById('no-alerts-message');
+                    if (noAlerts) { noAlerts.style.display = 'none'; }
+
+                    if (patientData[alertData.alert_id]) {
+                        patientData[alertData.alert_id].marker.setLatLng([alertData.latitude, alertData.longitude]);
+                    } else {
+                        const patientMarker = L.marker([alertData.latitude, alertData.longitude]).addTo(map)
+                            .bindPopup(`<b>Emergency!</b><br>${alertData.patient_name}<br>Condition: ${alertData.patient_condition}`);
+                        patientData[alertData.alert_id] = { marker: patientMarker, details: alertData.patient_details };
+                    }
+
+                    getRouteAndDraw(alertData.latitude, alertData.longitude, alertData.alert_id);
+                    renderAlertCard(alertData);
+                }
+            };
+
+            function updateTime() {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+                document.getElementById('current-time').innerText = timeString;
+            }
+            setInterval(updateTime, 1000);
+            updateTime();
+
+            function getDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371; // Radius of the earth in km
+                const dLat = deg2rad(lat2 - lat1);
+                const dLon = deg2rad(lon2 - lon1);
+                const a =
+                    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                const d = R * c; // Distance in km
+                return d;
+            }
+
+            function deg2rad(deg) {
+                return deg * (Math.PI / 180)
+            }
+
+            window.toggleAlert = function (alertId, lat, lon) {
+                const detailsElement = document.getElementById(`details-${alertId.replace('alert-', '')}`);
+                const isVisible = detailsElement.style.display === 'block';
+
+                document.querySelectorAll('.alert-details').forEach(el => el.style.display = 'none');
+
+                if (!isVisible) {
+                    detailsElement.style.display = 'block';
+                    map.flyTo([lat, lon], 15);
+                } else {
+                    map.flyTo(hospitalCoords, 13);
+                }
+            }
+
+            const alertsDataEl = document.getElementById('alerts-data');
+            let rawAlertsContent = alertsDataEl.textContent?.trim();
+            if (!rawAlertsContent || rawAlertsContent === '""') rawAlertsContent = '[]';
+
+            let initialAlerts;
+            try {
+                initialAlerts = JSON.parse(rawAlertsContent);
+            } catch (e) {
+                console.error("Invalid JSON for alerts, defaulting to empty array:", rawAlertsContent);
+                initialAlerts = [];
+            }
+
+            if (!Array.isArray(initialAlerts)) initialAlerts = [];
+
+            if (initialAlerts.length === 0) {
+                document.getElementById('no-alerts-message').style.display = 'block';
+            } else {
+                initialAlerts.forEach(alert => {
+
+                const alertData = {
+                    id: alert.id,
+                    latitude: alert.latitude,
+                    longitude: alert.longitude,
+                    patient_name: alert.patient_name,
+                    patient_id: alert.patient_id,
+                    patient_condition: alert.patient_condition,
+                    patient_details: {}
+                };
+
+                    renderAlertCard(alertData);
+                    getRouteAndDraw(alert.latitude, alert.longitude, alert.id);
+                    L.marker([alert.latitude, alert.longitude]).addTo(map)
+                        .bindPopup(`<b>Emergency!</b><br>${alert.patient__name}<br>Condition: ${alert.patient__condition}`);
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>
